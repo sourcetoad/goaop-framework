@@ -13,9 +13,9 @@ declare(strict_types=1);
 namespace Go\PhpUnit;
 
 use Go\Instrument\PathResolver;
-use Go\ParserReflection\ReflectionClass;
-use Go\ParserReflection\ReflectionEngine;
-use Go\ParserReflection\ReflectionFile;
+use Lanfix\ParserReflection\ReflectionClass;
+use Lanfix\ParserReflection\ReflectionEngine;
+use Lanfix\ParserReflection\ReflectionFile;
 
 /**
  * Utility functions that helps initialization of reflection classes that introspects classes and its members
@@ -28,9 +28,9 @@ final class ProxyClassReflectionHelper
     }
 
     /**
-     * Creates \Go\ParserReflection\ReflectionClass instance that introspects class without loading class into memory.
+     * Creates \Lanfix\ParserReflection\ReflectionClass instance that introspects class without loading class into memory.
      *
-     * @param string $className Full qualified class name for which \Go\ParserReflection\ReflectionClass ought to be initialized
+     * @param string $className Full qualified class name for which \Lanfix\ParserReflection\ReflectionClass ought to be initialized
      * @param array $configuration Configuration used for Go! AOP project setup
      */
     public static function createReflectionClass(string $className, array $configuration): ReflectionClass
