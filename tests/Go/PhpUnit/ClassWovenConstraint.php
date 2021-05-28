@@ -13,7 +13,7 @@ declare(strict_types=1);
 namespace Go\PhpUnit;
 
 use Go\Instrument\PathResolver;
-use Lanfix\ParserReflection\ReflectionClass;
+use Go\ParserReflection\ReflectionClass;
 use PHPUnit\Framework\Constraint\Constraint;
 
 /**

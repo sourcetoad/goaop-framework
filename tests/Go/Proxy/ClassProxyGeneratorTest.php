@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Go\Proxy;
 
-use Lanfix\ParserReflection\ReflectionEngine;
-use Lanfix\ParserReflection\ReflectionFile;
+use Go\ParserReflection\ReflectionEngine;
+use Go\ParserReflection\ReflectionFile;
 use Go\Proxy\Part\JoinPointPropertyGenerator;
 use Go\Stubs\First;
 use PHPUnit\Framework\TestCase;

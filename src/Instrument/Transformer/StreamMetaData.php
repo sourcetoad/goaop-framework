@@ -13,7 +13,7 @@ declare(strict_types = 1);
 namespace Go\Instrument\Transformer;
 
 use Go\Instrument\PathResolver;
-use Lanfix\ParserReflection\ReflectionEngine;
+use Go\ParserReflection\ReflectionEngine;
 use InvalidArgumentException;
 use PhpParser\Node;
 use function is_array, is_resource;

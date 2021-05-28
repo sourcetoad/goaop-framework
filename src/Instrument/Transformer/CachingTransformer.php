@@ -15,7 +15,7 @@ namespace Go\Instrument\Transformer;
 use Closure;
 use Go\Core\AspectKernel;
 use Go\Instrument\ClassLoading\CachePathManager;
-use Lanfix\ParserReflection\ReflectionEngine;
+use Go\ParserReflection\ReflectionEngine;
 
 use function dirname;
 

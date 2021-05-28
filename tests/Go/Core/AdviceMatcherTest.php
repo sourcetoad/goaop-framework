@@ -16,9 +16,9 @@ use Go\Aop\Advice;
 use Go\Aop\Pointcut;
 use Go\Aop\Support\DefaultPointcutAdvisor;
 use Go\Aop\Support\TruePointFilter;
-use Lanfix\ParserReflection\Locator\ComposerLocator;
-use Lanfix\ParserReflection\ReflectionEngine;
-use Lanfix\ParserReflection\ReflectionFile;
+use Go\ParserReflection\Locator\ComposerLocator;
+use Go\ParserReflection\ReflectionEngine;
+use Go\ParserReflection\ReflectionFile;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 

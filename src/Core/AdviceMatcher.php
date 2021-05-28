@@ -17,7 +17,7 @@ use Go\Aop\IntroductionAdvisor;
 use Go\Aop\PointcutAdvisor;
 use Go\Aop\PointFilter;
 use Go\Aop\Support\NamespacedReflectionFunction;
-use Lanfix\ParserReflection\ReflectionFileNamespace;
+use Go\ParserReflection\ReflectionFileNamespace;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;

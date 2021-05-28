@@ -13,7 +13,7 @@ declare(strict_types = 1);
 namespace Go\Functional;
 
 use Go\Core\AspectKernel;
-use Lanfix\ParserReflection\ReflectionClass;
+use Go\ParserReflection\ReflectionClass;
 use Go\Tests\TestProject\Application\Main;
 use Go\Instrument\Transformer\FilterInjectorTransformer;
 use InvalidArgumentException;

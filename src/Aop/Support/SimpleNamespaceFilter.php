@@ -13,7 +13,7 @@ declare(strict_types = 1);
 namespace Go\Aop\Support;
 
 use Go\Aop\PointFilter;
-use Lanfix\ParserReflection\ReflectionFileNamespace;
+use Go\ParserReflection\ReflectionFileNamespace;
 
 /**
  * Simple namespace matcher that match only specific namespace name

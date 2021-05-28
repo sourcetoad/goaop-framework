@@ -18,7 +18,7 @@ use Go\Core\AdviceMatcherInterface;
 use Go\Core\AspectContainer;
 use Go\Core\AspectLoader;
 use Go\Instrument\FileSystem\Enumerator;
-use Lanfix\ParserReflection\ReflectionFile;
+use Go\ParserReflection\ReflectionFile;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;

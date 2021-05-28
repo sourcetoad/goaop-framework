@@ -14,7 +14,7 @@ namespace Go\Core;
 
 use Go\Aop\Advice;
 use Go\Aop\Advisor;
-use Lanfix\ParserReflection\ReflectionFileNamespace;
+use Go\ParserReflection\ReflectionFileNamespace;
 use ReflectionClass;
 
 /**

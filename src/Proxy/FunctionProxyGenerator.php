@@ -15,7 +15,7 @@ namespace Go\Proxy;
 use Go\Aop\Framework\ReflectionFunctionInvocation;
 use Go\Core\AspectContainer;
 use Go\Core\AspectKernel;
-use Lanfix\ParserReflection\ReflectionFileNamespace;
+use Go\ParserReflection\ReflectionFileNamespace;
 use Go\Proxy\Part\FunctionCallArgumentListGenerator;
 use Go\Proxy\Part\InterceptedFunctionGenerator;
 use Laminas\Code\Generator\FileGenerator;
