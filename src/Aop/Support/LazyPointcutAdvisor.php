@@ -14,57 +14,48 @@ namespace Go\Aop\Support;
 
 use Go\Aop\Advice;
 use Go\Aop\Pointcut;
+use Go\Aop\Pointcut\PointcutLexer;
+use Go\Aop\Pointcut\PointcutParser;
 use Go\Aop\PointcutAdvisor;
 use Go\Core\AspectContainer;
 
 /**
  * Lazy pointcut advisor is used to create a delayed pointcut only when needed
  */
-class LazyPointcutAdvisor extends AbstractGenericAdvisor implements PointcutAdvisor
+final class LazyPointcutAdvisor implements PointcutAdvisor
 {
     /**
-     * Pointcut expression represented with string
+     * Instance of parsed pointcut, might be uninitialized if not parsed yet
      */
-    private string $pointcutExpression;
-
-    /**
-     * Instance of parsed pointcut
-     */
-    private ?Pointcut $pointcut = null;
-
-    /**
-     * Instance of aspect container
-     */
-    private AspectContainer $container;
+    private Pointcut $pointcut;
 
     /**
      * Creates the LazyPointcutAdvisor by specifying textual pointcut expression and Advice to run when Pointcut matches.
+     *
+     * @param string $pointcutExpression Pointcut expression represented with string
      */
-    public function __construct(AspectContainer $container, string $pointcutExpression, Advice $advice)
-    {
-        $this->container          = $container;
-        $this->pointcutExpression = $pointcutExpression;
-        parent::__construct($advice);
-    }
+    public function __construct(
+        private readonly AspectContainer $container,
+        private readonly string          $pointcutExpression,
+        private readonly Advice          $advice
+    ) {}
 
-    /**
-     * Get the Pointcut that drives this advisor.
-     */
     public function getPointcut(): Pointcut
     {
-        if ($this->pointcut === null) {
+        if (!isset($this->pointcut)) {
             // Inject these dependencies and make them lazy!
-
-            /** @var Pointcut\PointcutLexer $lexer */
-            $lexer = $this->container->get('aspect.pointcut.lexer');
-
-            /** @var Pointcut\PointcutParser $parser */
-            $parser = $this->container->get('aspect.pointcut.parser');
+            $lexer  = $this->container->getService(PointcutLexer::class);
+            $parser = $this->container->getService(PointcutParser::class);
 
             $tokenStream    = $lexer->lex($this->pointcutExpression);
             $this->pointcut = $parser->parse($tokenStream);
         }
 
         return $this->pointcut;
+    }
+
+    public function getAdvice(): Advice
+    {
+        return $this->advice;
     }
 }

@@ -28,8 +28,8 @@ class InterceptedMethodGeneratorTest extends TestCase
      * Tests that generator can generate valid method definition
      *
      * @throws \ReflectionException
-     * @dataProvider dataGenerator
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('dataGenerator')]
     public function testGenerate(string $className, string $methodName, string $expectedSignature): void
     {
         $reflectionMethod = new ReflectionMethod($className, $methodName);
@@ -46,23 +46,23 @@ class InterceptedMethodGeneratorTest extends TestCase
     /**
      * Provides list of methods with expected attributes
      */
-    public function dataGenerator(): array
+    public static function dataGenerator(): array
     {
         return [
             [
                 First::class,
                 'variadicArgsTest',
-                'public function variadicArgsTest(... $args) : string'
+                'public function variadicArgsTest(... $args): string'
             ],
             [
                 First::class,
                 'staticLsbRecursion',
-                'public static function staticLsbRecursion(int $value, int $level = 0) : int'
+                'public static function staticLsbRecursion(int $value, int $level = 0): int'
             ],
             [
                 First::class,
                 'staticLsbProtected',
-                'protected static function staticLsbProtected() : string'
+                'protected static function staticLsbProtected(): string'
             ],
             [
                 First::class,
@@ -72,7 +72,7 @@ class InterceptedMethodGeneratorTest extends TestCase
             [
                 First::class,
                 'privateMethod',
-                'private function privateMethod() : int'
+                'private function privateMethod(): int'
             ],
         ];
     }

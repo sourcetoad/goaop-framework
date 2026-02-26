@@ -12,10 +12,9 @@ declare(strict_types = 1);
 
 namespace Go\Core;
 
+use Closure;
 use OutOfBoundsException;
-use Go\Aop\Advisor;
 use Go\Aop\Aspect;
-use Go\Aop\Pointcut;
 
 /**
  * Aspect container interface
@@ -68,22 +67,38 @@ interface AspectContainer
     public const AOP_PROXIED_SUFFIX = '__AopProxied';
 
     /**
-     * Return a service or value from the container
+     * Returns a service from the container.
      *
-     * @return mixed
+     * Supports lazy-initialization if value is defined as a closure, it will be invoked once to perform initialization.
+     *
+     * @param class-string<T> $className Class-name of service to retrieve from the container
+     * @return object&T
+     *
+     * @template T of object
+     *
      * @throws OutOfBoundsException if service was not found
      */
-    public function get(string $id);
+    public function getService(string $className): object;
 
     /**
-     * Return list of service tagged with marker
+     * Return list of services tagged with marker interface
+     *
+     * @param class-string<T> $interfaceTagClassName Interface name of services to retrieve from the container
+     * @return T[]
+     *
+     * @template T
      */
-    public function getByTag(string $tag): array;
+    public function getServicesByInterface(string $interfaceTagClassName): array;
 
     /**
-     * Returns a pointcut by identifier
+     * Returns a value from the container
+     *
+     * @param string $key Given key
+     *
+     * @return mixed
+     * @throws OutOfBoundsException if key was not found
      */
-    public function getPointcut(string $id): Pointcut;
+    public function getValue(string $key): mixed;
 
     /**
      * Checks if item with specified id is present in the container
@@ -91,54 +106,30 @@ interface AspectContainer
     public function has(string $id): bool;
 
     /**
-     * Store the pointcut in the container
-     */
-    public function registerPointcut(Pointcut $pointcut, string $id): void;
-
-    /**
-     * Returns an advisor by identifier
-     */
-    public function getAdvisor(string $id): Advisor;
-
-    /**
-     * Store the advisor in the container
-     */
-    public function registerAdvisor(Advisor $advisor, string $id): void;
-
-    /**
      * Register an aspect in the container
      */
     public function registerAspect(Aspect $aspect): void;
 
     /**
-     * Returns an aspect by id or class name
-     */
-    public function getAspect(string $aspectName): Aspect;
-
-    /**
-     * Add an AOP resource to the container
-     * Resources is used to check the freshness of AOP cache
+     * Checks if there are any file resources with changes after since given timestamp
      *
-     * @param string $resource Path to the resource
+     * @return bool Whether or not there are new changes (file modification time of any resource is greater than given)
      */
-    public function addResource(string $resource);
+    public function hasAnyResourceChangedSince(int $timestamp): bool;
 
     /**
-     * Returns the list of AOP resources
-     */
-    public function getResources(): array;
-
-    /**
-     * Checks the freshness of AOP cache
+     * Adds a new item into the container
      *
-     * @return bool Whether or not concrete file is fresh
+     * @param string|class-string $id Identifier of value to store, either string literal or class-name
+     * @param mixed $value Value to store, if it is a Closure, it MAY be lazily-evaluated during getService() call
      */
-    public function isFresh(int $timestamp): bool;
+    public function add(string $id, mixed $value): void;
 
     /**
-     * Set a service into the container
+     * Adds a lazy service in the container, uses lazy-initialization Closure to optimize init time
      *
-     * @param mixed $value Value to store
+     * @param class-string $id Identifier of value to store, must be equal to the class-name
+     * @param Closure(AspectContainer $container): object $lazyInitializationClosure
      */
-    public function set(string $id, $value, array $tags = []): void;
+    public function addLazyService(string $id, Closure $lazyInitializationClosure): void;
 }

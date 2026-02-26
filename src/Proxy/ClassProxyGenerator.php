@@ -109,7 +109,7 @@ class ClassProxyGenerator
 
         $this->generator = new ClassGenerator(
             $originalClass->getShortName(),
-            $originalClass->getNamespaceName(),
+            !empty($originalClass->getNamespaceName()) ? $originalClass->getNamespaceName() : null,
             $originalClass->isFinal() ? ClassGenerator::FLAG_FINAL : null,
             $parentClassName,
             $introducedInterfaces,
@@ -127,7 +127,7 @@ class ClassProxyGenerator
     /**
      * Adds use alias for this class
      */
-    public function addUse(string $use, string $useAlias = null): void
+    public function addUse(string $use, string|null $useAlias = null): void
     {
         $this->generator->addUse($use, $useAlias);
     }
@@ -142,10 +142,9 @@ class ClassProxyGenerator
         $reflectionClass    = new ReflectionClass($targetClassName);
         $joinPointsProperty = $reflectionClass->getProperty(JoinPointPropertyGenerator::NAME);
 
-        $joinPointsProperty->setAccessible(true);
         $advices    = $joinPointsProperty->getValue();
-        $joinPoints = static::wrapWithJoinPoints($advices, $reflectionClass->getParentClass()->name);
-        $joinPointsProperty->setValue($joinPoints);
+        $joinPoints = static::wrapWithJoinPoints($advices, $reflectionClass->name);
+        $joinPointsProperty->setValue(null, $joinPoints);
 
         $staticInit = AspectContainer::STATIC_INIT_PREFIX . ':root';
         if (isset($joinPoints[$staticInit])) {
@@ -178,12 +177,11 @@ class ClassProxyGenerator
      */
     protected static function wrapWithJoinPoints(array $classAdvices, string $className): array
     {
-        /** @var ?LazyAdvisorAccessor $accessor */
         static $accessor = null;
 
         if (!isset($accessor)) {
             $aspectKernel = AspectKernel::getInstance();
-            $accessor     = $aspectKernel->getContainer()->get('aspect.advisor.accessor');
+            $accessor     = $aspectKernel->getContainer()->getService(LazyAdvisorAccessor::class);
         }
 
         $joinPoints = [];
@@ -245,8 +243,8 @@ class ClassProxyGenerator
         $return       = 'return ';
         if ($method->hasReturnType()) {
             $returnType = $method->getReturnType();
-            if ($returnType instanceof ReflectionNamedType && $returnType->getName() === 'void') {
-                // void return types should not return anything
+            if ($returnType instanceof ReflectionNamedType && in_array($returnType->getName(), ['void', 'never'], true)) {
+                // void/never return types should not return anything
                 $return = '';
             }
         }

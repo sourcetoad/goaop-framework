@@ -18,6 +18,7 @@ use PhpParser\Node;
 use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Name;
 use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\FindingVisitor;
 use ReflectionException;
 use ReflectionProperty;
 
@@ -49,12 +50,10 @@ final class ConstructorExecutionTransformer implements SourceTransformer
 
     /**
      * Rewrites all "new" expressions with our implementation
-     *
-     * @return string See RESULT_XXX constants in the interface
      */
-    public function transform(StreamMetaData $metadata): string
+    public function transform(StreamMetaData $metadata): TransformerResultEnum
     {
-        $newExpressionFinder = new NodeFinderVisitor([New_::class]);
+        $newExpressionFinder = new FindingVisitor(fn(Node $node) => $node instanceof New_);
 
         // TODO: move this logic into walkSyntaxTree(Visitor $nodeVistor) method
         $traverser = new NodeTraverser();
@@ -65,23 +64,23 @@ final class ConstructorExecutionTransformer implements SourceTransformer
         $newExpressions = $newExpressionFinder->getFoundNodes();
 
         if (empty($newExpressions)) {
-            return self::RESULT_ABSTAIN;
+            return TransformerResultEnum::RESULT_ABSTAIN;
         }
 
         foreach ($newExpressions as $newExpressionNode) {
             $startPosition = $newExpressionNode->getAttribute('startTokenPos');
 
-            $metadata->tokenStream[$startPosition][1] = '\\' . self::class . '::getInstance()->{';
-            if ($metadata->tokenStream[$startPosition + 1][0] === T_WHITESPACE) {
+            $metadata->tokenStream[$startPosition]->text = '\\' . self::class . '::getInstance()->{';
+            if ($metadata->tokenStream[$startPosition + 1]->id === T_WHITESPACE) {
                 unset($metadata->tokenStream[$startPosition + 1]);
             }
             $isExplicitClass                            = $newExpressionNode->class instanceof Name;
             $endClassNamePos                            = $newExpressionNode->class->getAttribute('endTokenPos');
             $expressionSuffix                           = $isExplicitClass ? '::class}' : '}';
-            $metadata->tokenStream[$endClassNamePos][1] .= $expressionSuffix;
+            $metadata->tokenStream[$endClassNamePos]->text .= $expressionSuffix;
         }
 
-        return self::RESULT_TRANSFORMED;
+        return TransformerResultEnum::RESULT_TRANSFORMED;
     }
 
     /**
@@ -116,7 +115,6 @@ final class ConstructorExecutionTransformer implements SourceTransformer
             $dynamicInit = AspectContainer::INIT_PREFIX . ':root';
             try {
                 $joinPointsRef = new ReflectionProperty($fullClassName, '__joinPoints');
-                $joinPointsRef->setAccessible(true);
                 $joinPoints = $joinPointsRef->getValue();
                 if (isset($joinPoints[$dynamicInit])) {
                     $invocation = $joinPoints[$dynamicInit];

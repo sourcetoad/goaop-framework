@@ -15,6 +15,7 @@ namespace Go\Proxy;
 use Go\Aop\Framework\ReflectionFunctionInvocation;
 use Go\Core\AspectContainer;
 use Go\Core\AspectKernel;
+use Go\Core\LazyAdvisorAccessor;
 use Go\ParserReflection\ReflectionFileNamespace;
 use Go\Proxy\Part\FunctionCallArgumentListGenerator;
 use Go\Proxy\Part\InterceptedFunctionGenerator;
@@ -79,7 +80,7 @@ class FunctionProxyGenerator
         static $accessor;
 
         if ($accessor === null) {
-            $accessor = AspectKernel::getInstance()->getContainer()->get('aspect.advisor.accessor');
+            $accessor = AspectKernel::getInstance()->getContainer()->getService(LazyAdvisorAccessor::class);
         }
 
         $filledAdvices = [];
@@ -111,8 +112,8 @@ class FunctionProxyGenerator
         $return = 'return ';
         if ($function->hasReturnType()) {
             $returnType = $function->getReturnType();
-            if ($returnType instanceof ReflectionNamedType && $returnType->getName() === 'void') {
-                // void return types should not return anything
+            if ($returnType instanceof ReflectionNamedType && in_array($returnType->getName(), ['void', 'never'], true)) {
+                // void/never return types should not return anything
                 $return = '';
             }
         }

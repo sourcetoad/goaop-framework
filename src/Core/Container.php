@@ -13,91 +13,212 @@ declare(strict_types = 1);
 namespace Go\Core;
 
 use Closure;
+use Go\Aop\Aspect;
+use Go\Aop\AspectException;
+use Go\Aop\Pointcut\PointcutGrammar;
+use Go\Aop\Pointcut\PointcutLexer;
+use Go\Aop\Pointcut\PointcutParser;
+use Go\Instrument\ClassLoading\CachePathManager;
 use OutOfBoundsException;
+use ReflectionClass;
+use ReflectionFunction;
+use ReflectionNamedType;
+use ReflectionObject;
 
 /**
  * DI-container
  */
-abstract class Container implements AspectContainer
+class Container implements AspectContainer
 {
     /**
-     * List of services in the container
+     * @var (array&array<string,mixed>) Hashmap of items/services in the container
      */
-    protected array $values = [];
+    private array $values = [];
 
     /**
-     * Store identifiers os services by tags
+     * @var (array&array<class-string, list<string>>) Holds information about mapping of interface tags into identifiers
      */
-    protected array $tags = [];
+    private array $tags = [];
 
     /**
-     * Set a service into the container
+     * Cached timestamp for resources, might be uninitialized if {@see self::hasAnyResourceChangedSince()} is not called yet
+     */
+    private int $cachedMaxTimestamp;
+
+    /**
+     * @var (array&array<string, string>) Hashmap of resources for application
+     */
+    private array $resources;
+
+    /**
+     * Constructor for container
      *
-     * @param mixed $value Value to store
+     * @param array<string> $resources [Optional] List of additional resources to track for container invalidation
      */
-    public function set(string $id, $value, array $tags = []): void
+    public function __construct(array $resources = [])
     {
-        $this->values[$id] = $value;
-        foreach ($tags as $tag) {
-            $this->tags[$tag][] = $id;
-        }
-    }
+        $this->resources = array_combine($resources, $resources);
 
-    /**
-     * Set a shared value in the container
-     */
-    public function share(string $id, Closure $value, array $tags = []): void
-    {
-        $value = function ($container) use ($value) {
-            static $sharedValue;
+        $this->addLazyService(PointcutLexer::class, fn(): PointcutLexer => new PointcutLexer());
 
-            if ($sharedValue === null) {
-                $sharedValue = $value($container);
+        $this->addLazyService(PointcutParser::class, fn(AspectContainer $container): PointcutParser => new PointcutParser(
+            new PointcutGrammar($container)
+        ));
+
+        $this->addLazyService(AdviceMatcher::class, fn(AspectContainer $container): AdviceMatcher => new AdviceMatcher(
+            (bool) $container->getValue('kernel.interceptFunctions')
+        ));
+
+        $this->addLazyService(AttributeAspectLoaderExtension::class, fn(AspectContainer $container): AttributeAspectLoaderExtension => new AttributeAspectLoaderExtension(
+            $container->getService(PointcutLexer::class),
+            $container->getService(PointcutParser::class)
+        ));
+
+        $this->addLazyService(IntroductionAspectExtension::class, fn(AspectContainer $container): IntroductionAspectExtension => new IntroductionAspectExtension(
+            $container->getService(PointcutLexer::class),
+            $container->getService(PointcutParser::class)
+        ));
+
+        $this->addLazyService(AspectLoader::class, fn(AspectContainer $container): AspectLoader => new AspectLoader(
+            $container,
+            $container->getService(AttributeAspectLoaderExtension::class),
+            $container->getService(IntroductionAspectExtension::class),
+        ));
+
+        $this->addLazyService(CachedAspectLoader::class, function (AspectContainer $container) {
+            $options = $container->getValue('kernel.options');
+            if (is_array($options) && !empty($options['cacheDir'])) {
+                $loader = new CachedAspectLoader($container, AspectLoader::class, $options);
+            } else {
+                $loader = $container->getService(AspectLoader::class);
             }
 
-            return $sharedValue;
-        };
-        $this->set($id, $value, $tags);
+            return $loader;
+        });
+
+        $this->addLazyService(LazyAdvisorAccessor::class, fn(AspectContainer $container): LazyAdvisorAccessor => new LazyAdvisorAccessor(
+            $container,
+            $container->getService(CachedAspectLoader::class)
+        ));
+
+        $this->addLazyService(CachePathManager::class, fn(AspectContainer $container): CachePathManager => new CachePathManager(
+            $container->getService(AspectKernel::class)
+        ));
     }
 
-    /**
-     * Return a service or value from the container
-     *
-     * @return mixed
-     * @throws OutOfBoundsException if service was not found
-     */
-    public function get(string $id)
+    final public function registerAspect(Aspect $aspect): void
     {
-        if (!isset($this->values[$id])) {
-            throw new OutOfBoundsException("Value {$id} is not defined in the container");
-        }
-        if ($this->values[$id] instanceof Closure) {
-            return $this->values[$id]($this);
-        }
-
-        return $this->values[$id];
+        $this->add($aspect::class, $aspect);
     }
 
-    /**
-     * Checks if item with specified id is present in the container
-     */
-    public function has(string $id): bool
+    final public function add(string $id, mixed $value): void
+    {
+        $this->values[$id] = $value;
+
+        // For objects we would like to use interface names as tags, eg Pointcut, Advisor, Aspect, etc
+        if (is_object($value)) {
+            // If it is real object (not a lazy closure), then we use it directly
+            if (!$value instanceof Closure) {
+                $reflectionInstance = new ReflectionObject($value);
+            } else {
+                // If it is our lazy Closure, we look at internal closure return type to check if it is a class
+                $reflectionClosure     = new ReflectionFunction($value);
+                $lazyDefinitionClosure = $reflectionClosure->getStaticVariables()['lazyInitializationClosure'] ?? null;
+                $lazyReturnType        = $lazyDefinitionClosure
+                    ? (new ReflectionFunction($lazyDefinitionClosure))->getReturnType()
+                    : null;
+
+                if ($lazyReturnType instanceof ReflectionNamedType && class_exists($lazyReturnType->getName())) {
+                    $reflectionInstance = new ReflectionClass($lazyReturnType->getName());
+                }
+            }
+        }
+
+        if (isset($reflectionInstance)) {
+            foreach ($reflectionInstance->getInterfaceNames() as $interfaceTagName) {
+                $this->tags[$interfaceTagName][] = $id;
+            }
+            // Also register corresponding file names to track freshness of container
+            $fileName = $reflectionInstance->getFileName();
+            if (is_string($fileName)) {
+                $this->addResource($fileName);
+            }
+        }
+    }
+
+    final public function addLazyService(string $id, Closure $lazyInitializationClosure): void
+    {
+        $this->add($id, function (self $container) use ($id, $lazyInitializationClosure): void {
+
+            $evaluatedLazyValue = $lazyInitializationClosure($container);
+            // Here we just replace Closure with resolved value to optimize access
+            $container->values[$id] = $evaluatedLazyValue;
+        });
+    }
+
+    final public function getService(string $className): object
+    {
+        if (!isset($this->values[$className])) {
+            throw new OutOfBoundsException("Value $className is not defined in the container");
+        }
+        // Support for lazy-evaluation and initialization
+        if ($this->values[$className] instanceof Closure) {
+            $this->values[$className]($this);
+        }
+        if (!$this->values[$className] instanceof $className) {
+            throw new AspectException("Service $className is not properly registered");
+        }
+
+        return $this->values[$className];
+    }
+
+    final public function getValue(string $key): mixed
+    {
+        if (!isset($this->values[$key])) {
+            throw new OutOfBoundsException("Value $key is not defined in the container");
+        }
+
+        return $this->values[$key];
+    }
+
+    final public function has(string $id): bool
     {
         return isset($this->values[$id]);
     }
 
-    /**
-     * Return list of service tagged with marker
-     */
-    public function getByTag(string $tag): array
+    final public function getServicesByInterface(string $interfaceTagClassName): array
     {
-        $result = [];
-        if (isset($this->tags[$tag])) {
-            foreach ($this->tags[$tag] as $id) {
-                $result[$id] = $this->get($id);
-            }
+        $values = [];
+        foreach (($this->tags[$interfaceTagClassName] ?? []) as $containerKey) {
+            $values[$containerKey] = $this->getValue($containerKey);
         }
 
-        return $result;
+        return $values;
+    }
+
+    final public function hasAnyResourceChangedSince(int $timestamp): bool
+    {
+        if (!isset($this->cachedMaxTimestamp)) {
+            $this->cachedMaxTimestamp = max(array_filter(array_map(filemtime(...), $this->resources)) + [0]);
+        }
+
+        return $this->cachedMaxTimestamp <= $timestamp;
+    }
+
+    /**
+     * Adds a link to the file resource into the container
+     *
+     * This set of resources is used later to check the freshness of cache
+     *
+     * @param string $resource Path to the resource
+     */
+    final protected function addResource(string $resource): void
+    {
+        if (!isset($this->resources[$resource])) {
+            $this->resources[$resource] = $resource;
+
+            // Invalidation of calculated timestamp
+            unset($this->cachedMaxTimestamp);
+        }
     }
 }

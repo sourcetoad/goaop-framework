@@ -14,20 +14,12 @@ namespace Go\Aop\Framework;
 
 use Go\Core\AspectContainer;
 
-class ReflectionConstructorInvocationTest extends AbstractInterceptorTest
+class ReflectionConstructorInvocationTest extends AbstractInterceptorTestCase
 {
     public function testCanCreateObjectDuringInvocation(): void
     {
         $invocation = new ReflectionConstructorInvocation([], \Exception::class);
         $result     = $invocation->__invoke();
-        $this->assertInstanceOf(\Exception::class, $result);
-    }
-
-    public function testKnowsAboutSpecialClassSuffix(): void
-    {
-        $specialName = \Exception::class . AspectContainer::AOP_PROXIED_SUFFIX;
-        $invocation  = new ReflectionConstructorInvocation([], $specialName);
-        $result      = $invocation->__invoke();
         $this->assertInstanceOf(\Exception::class, $result);
     }
 

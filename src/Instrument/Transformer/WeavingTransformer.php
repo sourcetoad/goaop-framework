@@ -74,11 +74,8 @@ class WeavingTransformer extends BaseSourceTransformer
 
     /**
      * This method may transform the supplied source and return a new replacement for it
-     *
-     * @param StreamMetaData $metadata
-     * @return string See RESULT_XXX constants in the interface
      */
-    public function transform(StreamMetaData $metadata): string
+    public function transform(StreamMetaData $metadata): TransformerResultEnum
     {
         $totalTransformations = 0;
         $parsedSource         = new ReflectionFile($metadata->uri, $metadata->syntaxTree);
@@ -88,7 +85,7 @@ class WeavingTransformer extends BaseSourceTransformer
         if (!empty($unloadedAspects)) {
             $this->loadAndRegisterAspects($unloadedAspects);
         }
-        $advisors = $this->container->getByTag('advisor');
+        $advisors = $this->container->getServicesByInterface(Advisor::class);
 
         $namespaces = $parsedSource->getFileNamespaces();
 
@@ -111,7 +108,7 @@ class WeavingTransformer extends BaseSourceTransformer
             $totalTransformations += (integer) $wasFunctionsProcessed;
         }
 
-        $result = ($totalTransformations > 0) ? self::RESULT_TRANSFORMED : self::RESULT_ABSTAIN;
+        $result = ($totalTransformations > 0) ? TransformerResultEnum::RESULT_TRANSFORMED : TransformerResultEnum::RESULT_ABSTAIN;
 
         return $result;
     }
@@ -174,7 +171,7 @@ class WeavingTransformer extends BaseSourceTransformer
         // Get last token for this class
         $lastClassToken = $class->getNode()->getAttribute('endTokenPos');
 
-        $metadata->tokenStream[$lastClassToken][1] .= PHP_EOL . $contentToInclude;
+        $metadata->tokenStream[$lastClassToken]->text .= PHP_EOL . $contentToInclude;
 
         return true;
     }
@@ -196,12 +193,12 @@ class WeavingTransformer extends BaseSourceTransformer
             if (isset($streamMetaData->tokenStream[$position])) {
                 $token = $streamMetaData->tokenStream[$position];
                 // Remove final and following whitespace from the class, child will be final instead
-                if ($token[0] === T_FINAL) {
+                if ($token->id === T_FINAL) {
                     unset($streamMetaData->tokenStream[$position], $streamMetaData->tokenStream[$position+1]);
                 }
                 // First string is class/trait name
-                if ($token[0] === T_STRING) {
-                    $streamMetaData->tokenStream[$position][1] = $newClassName;
+                if ($token->id === T_STRING) {
+                    $streamMetaData->tokenStream[$position]->text = $newClassName;
                     // We have finished our job, can break this loop
                     break;
                 }
@@ -224,7 +221,7 @@ class WeavingTransformer extends BaseSourceTransformer
                 if (isset($streamMetaData->tokenStream[$position])) {
                     $token = $streamMetaData->tokenStream[$position];
                     // Remove final and following whitespace from the method, child will be final instead
-                    if ($token[0] === T_FINAL) {
+                    if ($token->id === T_FINAL) {
                         unset($streamMetaData->tokenStream[$position], $streamMetaData->tokenStream[$position+1]);
                         break;
                     }
@@ -254,7 +251,7 @@ class WeavingTransformer extends BaseSourceTransformer
             $fileName = str_replace('\\', '/', $namespace->getName()) . '.php';
 
             $functionFileName = $cacheDir . $fileName;
-            if (!file_exists($functionFileName) || !$this->container->isFresh(filemtime($functionFileName))) {
+            if (!file_exists($functionFileName) || !$this->container->hasAnyResourceChangedSince(filemtime($functionFileName))) {
                 $functionAdvices = AbstractJoinpoint::flatAndSortAdvices($functionAdvices);
                 $dirname         = dirname($functionFileName);
                 if (!file_exists($dirname)) {
@@ -268,7 +265,7 @@ class WeavingTransformer extends BaseSourceTransformer
             $content = 'include_once AOP_CACHE_DIR . ' . var_export($cacheDirSuffix . $fileName, true) . ';';
 
             $lastTokenPosition = $namespace->getLastTokenPosition();
-            $metadata->tokenStream[$lastTokenPosition][1] .= PHP_EOL . $content;
+            $metadata->tokenStream[$lastTokenPosition]->text .= PHP_EOL . $content;
             $wasProcessedFunctions = true;
         }
 

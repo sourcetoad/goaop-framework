@@ -12,6 +12,7 @@ declare(strict_types = 1);
 
 namespace Go\Core;
 
+use AllowDynamicProperties;
 use RuntimeException;
 use Go\Aop\Advisor;
 use Go\Aop\Aspect;
@@ -23,6 +24,7 @@ use ReflectionClass;
  *
  * @property AspectLoader $loader
  */
+#[AllowDynamicProperties]
 class CachedAspectLoader extends AspectLoader
 {
     /**
@@ -48,7 +50,7 @@ class CachedAspectLoader extends AspectLoader
     public function __construct(AspectContainer $container, string $loaderId, array $options = [])
     {
         $this->cacheDir      = $options['cacheDir'] ?? null;
-        $this->cacheFileMode = $options['cacheFileMode'];
+        $this->cacheFileMode = $options['cacheFileMode'] ?? 0770 & ~umask();
         $this->loaderId      = $loaderId;
         $this->container     = $container;
     }
@@ -75,18 +77,10 @@ class CachedAspectLoader extends AspectLoader
     /**
      * {@inheritdoc}
      */
-    public function registerLoaderExtension(AspectLoaderExtension $loader): void
-    {
-        $this->loader->registerLoaderExtension($loader);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
     public function __get($name)
     {
         if ($name === 'loader') {
-            $this->loader = $this->container->get($this->loaderId);
+            $this->loader = $this->container->getService($this->loaderId);
 
             return $this->loader;
         }

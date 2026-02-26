@@ -15,7 +15,7 @@ namespace Go\Aop\Framework;
 use Go\Aop\Intercept\Invocation;
 use Go\Stubs\AbstractInterceptorMock;
 
-class BaseInterceptorTest extends AbstractInterceptorTest
+class BaseInterceptorTest extends AbstractInterceptorTestCase
 {
     /**
      * Concrete class name for mock, should be redefined with LSB
@@ -42,8 +42,17 @@ class BaseInterceptorTest extends AbstractInterceptorTest
 
         $mockClass      = get_class($mock);
         $mockNameLength = strlen($mockClass);
-        $result         = serialize($mock);
-        $expected       = 'C:' . $mockNameLength . ':"' . $mockClass . '":161:{a:1:{s:12:"adviceMethod";a:3:{s:5:"scope";s:6:"aspect";s:6:"method";s:26:"Go\Aop\Framework\{closure}";s:6:"aspect";s:36:"Go\Aop\Framework\BaseInterceptorTest";}}}';
+
+        // Derive closure name dynamically (PHP 8.4 changed closure naming)
+        $rf          = new \ReflectionFunction($advice);
+        $closureName = $rf->name;
+        $closureNameLength = strlen($closureName);
+
+        $adviceClass       = (new \ReflectionFunction($advice))->getClosureScopeClass()->getName();
+        $adviceClassLength = strlen($adviceClass);
+
+        $result   = serialize($mock);
+        $expected = 'O:' . $mockNameLength . ':"' . $mockClass . '":1:{s:12:"adviceMethod";a:2:{s:4:"name";s:' . $closureNameLength . ':"' . $closureName . '";s:5:"class";s:' . $adviceClassLength . ':"' . $adviceClass . '";}}';
 
         $this->assertEquals($expected, $result);
     }
@@ -57,7 +66,7 @@ class BaseInterceptorTest extends AbstractInterceptorTest
         $mockClass      = get_class($mock);
         $mockNameLength = strlen($mockClass);
         // Trick to mock unserialization of advice
-        $serialized = 'C:' . $mockNameLength .':"' . $mockClass . '":161:{a:1:{s:12:"adviceMethod";a:3:{s:5:"scope";s:6:"aspect";s:6:"method";s:26:"Go\Aop\Framework\{closure}";s:6:"aspect";s:36:"Go\Aop\Framework\BaseInterceptorTest";}}}';
+        $serialized = 'O:' . $mockNameLength .':"' . $mockClass . '":1:{s:12:"adviceMethod";a:3:{s:5:"scope";s:6:"aspect";s:6:"method";s:26:"Go\Aop\Framework\{closure}";s:6:"aspect";s:36:"Go\Aop\Framework\BaseInterceptorTest";}}';
         $result     = unserialize($serialized);
         $this->assertEquals($advice, $result->getRawAdvice());
     }

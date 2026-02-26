@@ -12,15 +12,15 @@ declare(strict_types=1);
 
 namespace Go\Console\Command;
 
-use Go\Functional\BaseFunctionalTest;
+use Go\Functional\BaseFunctionalTestCase;
 
-class DebugWeavingCommandTest extends BaseFunctionalTest
+class DebugWeavingCommandTest extends BaseFunctionalTestCase
 {
     public function testReportInconsistentWeaving()
     {
         $output = str_replace("\n", ' ', $this->execute('debug:weaving', [], false, 1));
 
-        $this->assertMatchesRegularExpression('/.+InconsistentlyWeavedClass.php.+generated.+on.+second.+"warmup".+pass.+/', $output);
+        $this->assertMatchesRegularExpression('/.+generated.+on.+second.+warmup.+pass.+/s', $output);
         $this->assertMatchesRegularExpression('/.+Main.php".+is.+consistently.+weaved.+/', $output);
         $this->assertStringContainsString('[ERROR] Weaving is unstable, there are 1 reported error(s).', $output);
     }

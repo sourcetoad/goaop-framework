@@ -15,7 +15,7 @@ namespace Go\Aop\Framework;
 use Go\Aop\Intercept\Interceptor;
 use Go\Aop\Intercept\Joinpoint;
 use Go\Aop\Intercept\MethodInvocation;
-use Go\Aop\PointFilter;
+use Go\Aop\Pointcut;
 use ReflectionClass;
 
 /**
@@ -24,37 +24,23 @@ use ReflectionClass;
  * For each invocation interceptor asks the pointcut if it matches the invocation.
  * Matcher will receive reflection point, object instance and invocation arguments to make a decision
  */
-class DynamicInvocationMatcherInterceptor implements Interceptor
+readonly class DynamicInvocationMatcherInterceptor implements Interceptor
 {
     /**
-     * Instance of pointcut to dynamically match joinpoints with args
+     * Dynamic invocation matcher constructor
      */
-    protected PointFilter $pointFilter;
+    public function __construct(
+        private Pointcut    $pointcut,
+        private Interceptor $interceptor
+    ){}
 
-    /**
-     * Instance of interceptor to invoke
-     */
-    protected Interceptor $interceptor;
-
-    /**
-     * Dynamic matcher constructor
-     */
-    public function __construct(PointFilter $pointFilter, Interceptor $interceptor)
-    {
-        $this->pointFilter = $pointFilter;
-        $this->interceptor = $interceptor;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    final public function invoke(Joinpoint $joinpoint)
+    final public function invoke(Joinpoint $joinpoint): mixed
     {
         if ($joinpoint instanceof MethodInvocation) {
             $method       = $joinpoint->getMethod();
             $context      = $joinpoint->getThis() ?? $joinpoint->getScope();
             $contextClass = new ReflectionClass($context);
-            if ($this->pointFilter->matches($method, $contextClass, $context, $joinpoint->getArguments())) {
+            if ($this->pointcut->matches($contextClass, $method, $context, $joinpoint->getArguments())) {
                 return $this->interceptor->invoke($joinpoint);
             }
         }

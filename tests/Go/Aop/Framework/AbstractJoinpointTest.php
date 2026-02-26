@@ -7,6 +7,7 @@ namespace Go\Aop\Framework;
 use Go\Aop\AdviceAfter;
 use Go\Aop\AdviceAround;
 use Go\Aop\AdviceBefore;
+use Go\Aop\OrderedAdvice;
 use PHPUnit\Framework\TestCase;
 
 class AbstractJoinpointTest extends TestCase
@@ -14,10 +15,10 @@ class AbstractJoinpointTest extends TestCase
     protected AbstractJoinpoint $joinpoint;
 
     /**
-     * @dataProvider sortingTestSource
      * @param array $advices
      * @param array $order
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('sortingTestSource')]
     public function testSortingLogic(array $advices, array $order = []): void
     {
         $advices = AbstractJoinpoint::sortAdvices($advices);

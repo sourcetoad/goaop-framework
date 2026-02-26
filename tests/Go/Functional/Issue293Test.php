@@ -15,7 +15,7 @@ namespace Go\Functional;
 use Go\Tests\TestProject\Application\Issue293DynamicMembers;
 use Go\Tests\TestProject\Application\Issue293StaticMembers;
 
-class Issue293Test extends BaseFunctionalTest
+class Issue293Test extends BaseFunctionalTestCase
 {
     /**
      * test for https://github.com/goaop/framework/issues/293
@@ -23,8 +23,8 @@ class Issue293Test extends BaseFunctionalTest
     public function testItDoesNotWeaveDynamicMethodsForComplexStaticPointcut()
     {
         $this->assertClassIsWoven(Issue293StaticMembers::class);
-        $this->assertStaticMethodWoven(Issue293StaticMembers::class, 'doSomething', 'advisor.Go\\Tests\\TestProject\\Aspect\\Issue293Aspect->afterPublicOrProtectedStaticMethods');
-        $this->assertStaticMethodWoven(Issue293StaticMembers::class, 'doSomethingElse', 'advisor.Go\\Tests\\TestProject\\Aspect\\Issue293Aspect->afterPublicOrProtectedStaticMethods');
+        $this->assertStaticMethodWoven(Issue293StaticMembers::class, 'doSomething', 'Go\\Tests\\TestProject\\Aspect\\Issue293Aspect->afterPublicOrProtectedStaticMethods');
+        $this->assertStaticMethodWoven(Issue293StaticMembers::class, 'doSomethingElse', 'Go\\Tests\\TestProject\\Aspect\\Issue293Aspect->afterPublicOrProtectedStaticMethods');
 
         // it does not weaves Issue293DynamicMembers class
         $this->assertClassIsNotWoven(Issue293DynamicMembers::class);

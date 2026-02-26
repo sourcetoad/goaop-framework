@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace Go\Aop\Framework;
 
-use Go\Aop\Support\AnnotationAccess;
 use PHPUnit\Framework\TestCase;
 
 class AbstractMethodInvocationTest extends TestCase
@@ -21,12 +20,55 @@ class AbstractMethodInvocationTest extends TestCase
 
     public function testInvocationReturnsMethod(): void
     {
-        $this->assertEquals(self::class, $this->invocation->getMethod()->class);
+        // AbstractMethodInvocation uses prototype methods to avoid hard-coded class sufixes
+        $this->assertEquals(parent::class, $this->invocation->getMethod()->class);
         $this->assertEquals('setUp', $this->invocation->getMethod()->name);
     }
 
-    public function testProvidesAccessToAnnotations(): void
+    /**
+     * @link https://github.com/goaop/framework/issues/481
+     */
+    public function testInstanceIsInitialized(): void
     {
-        $this->assertInstanceOf(AnnotationAccess::class, $this->invocation->getMethod());
+        $this->expectNotToPerformAssertions();
+
+        $o = new class extends AbstractMethodInvocation {
+
+            protected static string $propertyName = 'scope';
+
+            /**
+             * @var (string&class-string) Class name scope for static invocation
+             */
+            protected string $scope;
+
+            public function __construct()
+            {
+                parent::__construct([new AroundInterceptor(function () {})], AbstractMethodInvocationTest::class, 'testInstanceIsInitialized');
+            }
+
+            public function isDynamic(): bool
+            {
+                return false;
+            }
+
+            public function getThis(): ?object
+            {
+                return null;
+            }
+
+            public function getScope(): string
+            {
+                return self::class;
+            }
+
+            public function proceed(): void
+            {
+                if ($this->level < 3) {
+                    $this->__invoke($this->scope);
+                }
+            }
+        };
+
+        $o->__invoke($o::class);
     }
 }

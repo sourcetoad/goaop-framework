@@ -12,16 +12,17 @@ declare(strict_types = 1);
 
 namespace Go\Core;
 
-use Go\Aop\Advisor;
+use Go\Aop\Advice;
 use Go\Aop\Aspect;
 use Go\Aop\Framework\DeclareErrorInterceptor;
 use Go\Aop\Framework\TraitIntroductionInfo;
 use Go\Aop\Pointcut;
-use Go\Aop\Support\DeclareParentsAdvisor;
-use Go\Aop\Support\DefaultPointcutAdvisor;
-use Go\Lang\Annotation;
-use Go\Lang\Annotation\DeclareParents;
+use Go\Aop\Support\GenericPointcutAdvisor;
+use Go\Lang\Attribute\AbstractAttribute;
+use Go\Lang\Attribute\DeclareError;
+use Go\Lang\Attribute\DeclareParents;
 use ReflectionClass;
+use ReflectionProperty;
 use UnexpectedValueException;
 
 /**
@@ -29,49 +30,62 @@ use UnexpectedValueException;
  */
 class IntroductionAspectExtension extends AbstractAspectLoaderExtension
 {
-    /**
-     * Loads definition from specific point of aspect into the container
-     *
-     * @param Aspect          $aspect           Instance of aspect
-     * @param ReflectionClass $reflectionAspect Reflection of point
-     *
-     * @return array<string,Pointcut>|array<string,Advisor>
-     *
-     * @throws UnexpectedValueException
-     */
+
     public function load(Aspect $aspect, ReflectionClass $reflectionAspect): array
     {
         $loadedItems = [];
         foreach ($reflectionAspect->getProperties() as $aspectProperty) {
-            $propertyId  = $reflectionAspect->getName() . '->'. $aspectProperty->getName();
-            $annotations = $this->reader->getPropertyAnnotations($aspectProperty);
+            $propertyId = $reflectionAspect->getName() . '->'. $aspectProperty->getName();
+            $attributes = $aspectProperty->getAttributes();
 
-            foreach ($annotations as $annotation) {
-                if ($annotation instanceof DeclareParents) {
-                    $pointcut = $this->parsePointcut($aspect, $aspectProperty, $annotation->value);
-
-                    $implement        = $annotation->defaultImpl;
-                    $interface        = $annotation->interface;
-                    $introductionInfo = new TraitIntroductionInfo($implement, $interface);
-                    $advisor          = new DeclareParentsAdvisor($pointcut, $introductionInfo);
+            foreach ($attributes as $reflectionAttribute) {
+                $attribute = $reflectionAttribute->newInstance();
+                if ($attribute instanceof DeclareParents) {
+                    $pointcut = $this->parsePointcut($aspect, $aspectProperty, $attribute->expression);
+                    // Introduction doesn't have own syntax and uses any suitable class-filter
+                    $pointcut = new Pointcut\AndPointcut(
+                        Pointcut::KIND_INTRODUCTION | Pointcut::KIND_CLASS,
+                        $pointcut
+                    );
+                    $advice  = $this->getAdvice($attribute, $aspect, $aspectProperty);
+                    $advisor = new GenericPointcutAdvisor($pointcut, $advice);
 
                     $loadedItems[$propertyId] = $advisor;
-                } elseif ($annotation instanceof Annotation\DeclareError) {
-                    $pointcut = $this->parsePointcut($aspect, $reflectionAspect, $annotation->value);
+                } elseif ($attribute instanceof DeclareError) {
+                    $pointcut = $this->parsePointcut($aspect, $reflectionAspect, $attribute->expression);
+                    $advice   = $this->getAdvice($attribute, $aspect, $aspectProperty);
 
-                    $aspectProperty->setAccessible(true);
-                    $errorMessage     = $aspectProperty->getValue($aspect);
-                    $errorLevel       = $annotation->level;
-                    $introductionInfo = new DeclareErrorInterceptor($errorMessage, $errorLevel, $annotation->value);
-                    $loadedItems[$propertyId] = new DefaultPointcutAdvisor($pointcut, $introductionInfo);
-                    break;
-
+                    $loadedItems[$propertyId] = new GenericPointcutAdvisor($pointcut, $advice);
                 } else {
-                    throw new UnexpectedValueException('Unsupported annotation class: ' . get_class($annotation));
+                    throw new UnexpectedValueException('Unsupported attribute class: ' . get_class($attribute));
                 }
             }
         }
 
         return $loadedItems;
+    }
+
+    /**
+     * Returns an interceptor instance by meta-type attribute and closure
+     *
+     * @throws UnexpectedValueException For unsupported annotations
+     */
+    protected function getAdvice(
+        AbstractAttribute $interceptorAttribute,
+        Aspect $aspect,
+        ReflectionProperty $aspectProperty
+    ): Advice {
+        $pointcutExpression = $interceptorAttribute->expression;
+        switch (true) {
+            case ($interceptorAttribute instanceof DeclareError):
+                $errorMessage = $aspectProperty->getDefaultValue();
+                return new DeclareErrorInterceptor($errorMessage, $interceptorAttribute->level, $pointcutExpression);
+
+            case ($interceptorAttribute instanceof DeclareParents):
+                return new TraitIntroductionInfo($interceptorAttribute->trait, $interceptorAttribute->interface);
+
+            default:
+                throw new UnexpectedValueException('Unsupported attribute class: ' . get_class($interceptorAttribute));
+        }
     }
 }

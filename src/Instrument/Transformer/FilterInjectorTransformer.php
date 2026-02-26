@@ -14,8 +14,10 @@ namespace Go\Instrument\Transformer;
 use Go\Core\AspectKernel;
 use Go\Instrument\PathResolver;
 use Go\Instrument\ClassLoading\CachePathManager;
+use PhpParser\Node;
 use PhpParser\Node\Expr\Include_;
 use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\FindingVisitor;
 use RuntimeException;
 
 /**
@@ -99,12 +101,10 @@ class FilterInjectorTransformer implements SourceTransformer
 
     /**
      * Wrap all includes into rewrite filter
-     *
-     * @return string See RESULT_XXX constants in the interface
      */
-    public function transform(StreamMetaData $metadata): string
+    public function transform(StreamMetaData $metadata): TransformerResultEnum
     {
-        $includeExpressionFinder = new NodeFinderVisitor([Include_::class]);
+        $includeExpressionFinder = new FindingVisitor(fn(Node $node) => $node instanceof Include_);
 
         // TODO: move this logic into walkSyntaxTree(Visitor $nodeVistor) method
         $traverser = new NodeTraverser();
@@ -115,21 +115,21 @@ class FilterInjectorTransformer implements SourceTransformer
         $includeExpressions = $includeExpressionFinder->getFoundNodes();
 
         if (empty($includeExpressions)) {
-            return self::RESULT_ABSTAIN;
+            return TransformerResultEnum::RESULT_ABSTAIN;
         }
 
         foreach ($includeExpressions as $includeExpression) {
             $startPosition = $includeExpression->getAttribute('startTokenPos');
             $endPosition   = $includeExpression->getAttribute('endTokenPos');
 
-            $metadata->tokenStream[$startPosition][1] .= ' \\' . self::class . '::rewrite(';
-            if ($metadata->tokenStream[$startPosition+1][0] === T_WHITESPACE) {
+            $metadata->tokenStream[$startPosition]->text .= ' \\' . self::class . '::rewrite(';
+            if ($metadata->tokenStream[$startPosition+1]->id === T_WHITESPACE) {
                 unset($metadata->tokenStream[$startPosition+1]);
             }
 
-            $metadata->tokenStream[$endPosition][1] .= ', __DIR__)';
+            $metadata->tokenStream[$endPosition]->text .= ', __DIR__)';
         }
 
-        return self::RESULT_TRANSFORMED;
+        return TransformerResultEnum::RESULT_TRANSFORMED;
     }
 }

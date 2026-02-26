@@ -13,12 +13,14 @@ declare(strict_types = 1);
 namespace Go\Instrument\Transformer;
 
 use Go\Core\AspectKernel;
+use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Scalar\MagicConst;
 use PhpParser\Node\Scalar\MagicConst\Dir;
 use PhpParser\Node\Scalar\MagicConst\File;
 use PhpParser\NodeTraverser;
 use PhpParser\Node\Identifier;
+use PhpParser\NodeVisitor\FindingVisitor;
 
 /**
  * Transformer that replaces magic __DIR__ and __FILE__ constants in the source code
@@ -49,16 +51,14 @@ class MagicConstantTransformer extends BaseSourceTransformer
 
     /**
      * This method may transform the supplied source and return a new replacement for it
-     *
-     * @return string See RESULT_XXX constants in the interface
      */
-    public function transform(StreamMetaData $metadata): string
+    public function transform(StreamMetaData $metadata): TransformerResultEnum
     {
         $this->replaceMagicDirFileConstants($metadata);
         $this->wrapReflectionGetFileName($metadata);
 
         // We should always vote abstain, because if there is only changes for magic constants, we can drop them
-        return self::RESULT_ABSTAIN;
+        return TransformerResultEnum::RESULT_ABSTAIN;
     }
 
     /**
@@ -81,7 +81,7 @@ class MagicConstantTransformer extends BaseSourceTransformer
      */
     private function wrapReflectionGetFileName(StreamMetaData $metadata): void
     {
-        $methodCallFinder = new NodeFinderVisitor([MethodCall::class]);
+        $methodCallFinder = new FindingVisitor(fn(Node $node) => $node instanceof MethodCall);
         $traverser        = new NodeTraverser();
         $traverser->addVisitor($methodCallFinder);
         $traverser->traverse($metadata->syntaxTree);
@@ -94,8 +94,8 @@ class MagicConstantTransformer extends BaseSourceTransformer
                 $endPosition      = $methodCallNode->getAttribute('endTokenPos');
                 $expressionPrefix = '\\' . self::class . '::resolveFileName(';
 
-                $metadata->tokenStream[$startPosition][1] = $expressionPrefix . $metadata->tokenStream[$startPosition][1];
-                $metadata->tokenStream[$endPosition][1] .= ')';
+                $metadata->tokenStream[$startPosition]->text = $expressionPrefix . $metadata->tokenStream[$startPosition]->text;
+                $metadata->tokenStream[$endPosition]->text .= ')';
             }
 
         }
@@ -106,7 +106,7 @@ class MagicConstantTransformer extends BaseSourceTransformer
      */
     private function replaceMagicDirFileConstants(StreamMetaData $metadata): void
     {
-        $magicConstFinder = new NodeFinderVisitor([Dir::class, File::class]);
+        $magicConstFinder = new FindingVisitor(fn(Node $node) => $node instanceof Dir || $node instanceof File);
         $traverser        = new NodeTraverser();
         $traverser->addVisitor($magicConstFinder);
         $traverser->traverse($metadata->syntaxTree);
@@ -119,7 +119,7 @@ class MagicConstantTransformer extends BaseSourceTransformer
             $tokenPosition = $magicConstantNode->getAttribute('startTokenPos');
             $replacement   = $magicConstantNode instanceof Dir ? $magicDirValue : $magicFileValue;
 
-            $metadata->tokenStream[$tokenPosition][1] = "'{$replacement}'";
+            $metadata->tokenStream[$tokenPosition]->text = "'{$replacement}'";
         }
     }
 }
