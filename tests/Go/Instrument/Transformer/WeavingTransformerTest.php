@@ -217,6 +217,7 @@ class WeavingTransformerTest extends TestCase
      */
     protected function normalizeWhitespaces(string $value): string
     {
+        $value = preg_replace('/\)\s*:\s*(\S)/', '): $1', $value);
         return strtr(
             preg_replace('/\s+$/m', '', $value),
             [

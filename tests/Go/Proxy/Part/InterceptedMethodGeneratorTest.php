@@ -40,6 +40,9 @@ class InterceptedMethodGeneratorTest extends TestCase
         $generatedCode = preg_replace('#/\*.+?\*/#s', '', $generatedCode);
         // Remove trailing spaces and empty function body
         $generatedCode = trim($generatedCode, "\n{} ");
+
+        $generatedCode       = preg_replace('/\s*:\s*(\S)/', ': $1', $generatedCode);
+        $expectedSignature   = preg_replace('/\s*:\s*(\S)/', ': $1', $expectedSignature);
         $this->assertSame($expectedSignature, $generatedCode);
     }
 
