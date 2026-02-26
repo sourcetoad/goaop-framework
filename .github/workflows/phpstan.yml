@@ -26,4 +26,4 @@ jobs:
       - name: "Install dependencies"
         run: "composer install --no-interaction --no-progress --no-suggest"
       - name: "Static analysis"
-        uses: chindit/actions-phpstan@master
+        run: "vendor/bin/phpstan analyse"
